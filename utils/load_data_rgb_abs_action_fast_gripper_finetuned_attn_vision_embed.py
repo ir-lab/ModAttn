@@ -9,10 +9,41 @@ import json
 import bisect
 import clip
 import random
+import cv2
+from PIL import Image
+
+# For MAE vision encoder
+import sys
+sys.path.append('/home/local/ASUAD/yzhou298/github/mae')
+import models_vit
+
+def prepare_model(chkpt_dir, arch='vit_large_patch16'):
+    # build model
+    model = getattr(models_vit, arch)(global_pool=True)
+    # load model
+    checkpoint = torch.load(chkpt_dir, map_location='cuda')
+    msg = model.load_state_dict(checkpoint['model'], strict=False)
+    print(msg)
+    return model
+
+
+class ImgEncoder(nn.Module):
+    def __init__(self, chkpt_dir = 'mae_pretrain_vit_large.pth', arch='vit_large_patch16'):
+        super(ImgEncoder, self).__init__()
+        self.model_mae = prepare_model(chkpt_dir, arch)
+        
+    def forward(self, x):
+        x = x.permute(0, 3, 1, 2)
+        out = self.model_mae.forward_features(x)
+        return out
 
 
 class DMPDatasetEERandTarXYLang(Dataset):
-    def __init__(self, data_dirs, random=True, normalize='separate', length_total=91, depth_scale=1000.):
+    def __init__(self, data_dirs, 
+    random=True, normalize='separate', length_total=91, depth_scale=1000., 
+    chkpt_dir='mae_scripts/mae_pretrain_vit_large.pth', arch='vit_large_patch16', 
+    source_root = '/home/local/ASUAD/yzhou298/Documents/dataset/',
+    target_root = '/media/yzhou298/e/'):
         # |--datadir
         #     |--trial0
         #         |--img0
@@ -24,9 +55,14 @@ class DMPDatasetEERandTarXYLang(Dataset):
 
         assert normalize in ['separate', 'together', 'none', 'panda', 'jaco2']
 
+        self.visual_encoder = None
+
+
         all_dirs = []
         for data_dir in data_dirs:
-            all_dirs = all_dirs + [ f.path for f in os.scandir(data_dir) if f.is_dir() ]
+            abs_data_dir = os.path.join(source_root, data_dir)
+            all_dirs = all_dirs + [ os.path.join(data_dir, f.name) for f in os.scandir(abs_data_dir) if f.is_dir() ]
+
         # print(all_dirs)
         # print(len(all_dirs))
         self.random = random
@@ -68,14 +104,15 @@ class DMPDatasetEERandTarXYLang(Dataset):
 
             trial_dict = {}
 
-            states_json = os.path.join(trial, 'states.json')
+            states_json = os.path.join(source_root, trial, 'states.json')
             with open(states_json) as json_file:
                 states_dict = json.load(json_file)
                 json_file.close()
             
             # There are (trial_dict['len']) states
             trial_dict['len'] = len(states_dict)
-            trial_dict['img_paths'] = [os.path.join(trial, str(i) + '.png') for i in range(trial_dict['len'])]
+            trial_dict['img_paths'] = [os.path.join(source_root, trial, str(i) + '.png') for i in range(trial_dict['len'])]
+            trial_dict['img_paths_npy'] = [os.path.join(target_root, trial, str(i) + '.npy') for i in range(trial_dict['len'])]
             trial_dict['depth_paths'] = [os.path.join(trial, str(i) + '_depth_map.npy') for i in range(trial_dict['len'])]
             trial_dict['joint_angles'] = np.asarray([states_dict[i]['q'] for i in range(trial_dict['len'])])
             
@@ -126,6 +163,12 @@ class DMPDatasetEERandTarXYLang(Dataset):
         # print(np.mean(trial_dict['displacement']['target2'], axis=0))
         # print(np.std(trial_dict['displacement']['target2'], axis=0))
         # exit()
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
+        self.imagenet_std = np.array([0.229, 0.224, 0.225])
+
+
+
+
 
     def rpy2rrppyy(self, rpy):
         rrppyy = [0] * 6
@@ -183,8 +226,9 @@ class DMPDatasetEERandTarXYLang(Dataset):
         return sentence.strip()
 
     def xyz_to_xy(self, xyz):
+        # x: left to right
+        # y: top to down
         xy = np.dot(xyz, self.weight) + self.bias
-        xy[1] = 224 - xy[1]
         return xy
 
     def __len__(self):
@@ -196,15 +240,32 @@ class DMPDatasetEERandTarXYLang(Dataset):
             step_idx = index
         else:
             step_idx = index - self.lengths_index[trial_idx - 1]
+        
+        # img = io.imread(self.trials[trial_idx]['img_paths'][step_idx])[:,:,:3] / 255.
+        # cv2.imshow('img', img)
+        # cv2.waitKey(-1)
 
-
-        img = torch.tensor(io.imread(self.trials[trial_idx]['img_paths'][step_idx])[::-1,:,:3] / 255, dtype=torch.float32)
-        # depth = np.load(self.trials[trial_idx]['depth_paths'][step_idx])[::-1,:]
-        # depth = np.float32(depth) / 1000
-        # depth[depth > 30] = 0
-        # depth = torch.tensor(depth, dtype=torch.float32)
-
-        # img = torch.cat((img, depth.unsqueeze(axis=2)), axis=2)
+        if os.path.isfile(self.trials[trial_idx]['img_paths_npy'][step_idx]):
+            img = np.load(self.trials[trial_idx]['img_paths_npy'][step_idx])
+            img = torch.tensor(img, dtype=torch.float32)
+        else:
+            print(f"file missing: {self.trials[trial_idx]['img_paths_npy'][step_idx]}")
+            folder = r'/' + r'/'.join(npy_path[i].split(r'/')[:-1])
+            
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            
+            if self.visual_encoder is None:
+                self.visual_encoder = ImgEncoder(chkpt_dir, arch)
+            
+            img = np.array(Image.open(self.trials[trial_idx]['img_paths'][step_idx]))[:,:,:3] / 255.
+            img = img - imagenet_mean
+            img = img / imagenet_std
+            img = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
+            with torch.no_grad():
+                img = self.visual_encoder(img)[0]
+            img_np = img.clone().detach().cpu().numpy()
+            np.save(self.trials[trial_idx]['img_paths_npy'][step_idx], img_np)
 
         length = torch.tensor(self.trials[trial_idx]['len'] - step_idx, dtype=torch.float32)
         ee_pos = torch.tensor((self.trials[trial_idx]['EE_xyzrpy'][step_idx] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
@@ -308,34 +369,17 @@ def pad_collate_xy_lang(batch):
 
 
 if __name__ == '__main__':
+    train_set_path = 'extended_modattn/put_right_to/split1'
+    val_set_path = 'extended_modattn/put_right_to/split2'
     data_dirs = [
-        '/mnt/disk3/dataset/mujoco_dataset_pick_push_RGBD_different_angles_fast_gripper_224_jaco2_test/'
+       val_set_path,
     ]
-    dataset = DMPDatasetEERandTarXYLang(data_dirs, random=False, normalize='jaco2')
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2,
+    dataset_train = DMPDatasetEERandTarXYLang(data_dirs, random=False, length_total=120, chkpt_dir='../mae_scripts/mae_pretrain_vit_large.pth')
+    data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=1,
                                           shuffle=True, num_workers=1,
                                           collate_fn=pad_collate_xy_lang)
 
-    for img, target, joint_angles, ee_pos, ee_traj, length, target_pos, phis, mask, target_xy, sentence, joint_angles_traj in dataloader:
-        # print(target, joint_angles, ee_pos, ee_traj, length, target_pos)
-        # print(length, len(ee_traj))
-        print(target.shape, joint_angles.shape, ee_pos.shape, ee_traj.shape, length.shape, target_pos.shape, phis.shape, mask.shape, sentence.shape, img.shape, joint_angles_traj.shape)
-        print(target[0], target_pos[0])
-
-        fig = plt.figure(figsize=plt.figaspect(0.5))
-
-        ax = fig.add_subplot(1, 2, 1)
-        ax.imshow(img[0].numpy())
-
-        ax = fig.add_subplot(1, 2, 2)
-        xs = np.arange(joint_angles_traj.shape[2])
-        ax.plot(xs, joint_angles_traj[0, 0, :], label='0')
-        ax.plot(xs, joint_angles_traj[0, 1, :], label='1')
-        ax.plot(xs, joint_angles_traj[0, 2, :], label='2')
-        ax.plot(xs, joint_angles_traj[0, 3, :], label='3')
-        ax.plot(xs, joint_angles_traj[0, 4, :], label='4')
-        ax.plot(xs, joint_angles_traj[0, 5, :], label='5')
-        ax.plot(xs, joint_angles_traj[0, 6, :], label='6')
-        ax.legend()
+    for img, target_1, target_2, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, target_2_pos, phis, mask, target_1_xy, target_2_xy, sentence, joint_angles_traj, displacement_1, displacement_2 in data_loader_train:
         
-        # plt.show()
+        print(ee_xy)
+        continue

@@ -126,6 +126,8 @@ class DMPDatasetEERandTarXYLang(Dataset):
         # print(np.mean(trial_dict['displacement']['target2'], axis=0))
         # print(np.std(trial_dict['displacement']['target2'], axis=0))
         # exit()
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
+        self.imagenet_std = np.array([0.229, 0.224, 0.225])
 
     def rpy2rrppyy(self, rpy):
         rrppyy = [0] * 6
@@ -197,8 +199,10 @@ class DMPDatasetEERandTarXYLang(Dataset):
         else:
             step_idx = index - self.lengths_index[trial_idx - 1]
 
-
-        img = torch.tensor(io.imread(self.trials[trial_idx]['img_paths'][step_idx])[::-1,:,:3] / 255, dtype=torch.float32)
+        img = io.imread(self.trials[trial_idx]['img_paths'][step_idx])[::-1,:,:3] / 255.
+        img = img - self.imagenet_mean
+        img = img / self.imagenet_std
+        img = torch.tensor(img, dtype=torch.float32)
         # depth = np.load(self.trials[trial_idx]['depth_paths'][step_idx])[::-1,:]
         # depth = np.float32(depth) / 1000
         # depth[depth > 30] = 0

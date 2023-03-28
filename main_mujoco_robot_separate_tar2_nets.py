@@ -1,6 +1,6 @@
 import numpy as np
 # np.set_printoptions(precision=3, suppress=True)
-from models.backbone_rgbd_sub_attn import Backbone
+from models.backbone_rgbd_sub_attn_separate_tar2_nets import Backbone
 from utils.load_data_rgb_abs_action_fast_gripper_finetuned_attn import DMPDatasetEERandTarXYLang, pad_collate_xy_lang
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
@@ -489,6 +489,6 @@ def main(writer, name, batch_size=96):
 
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-corrected-sentence'
+    name = 'train-rgb-sub-attn-abs-action-corrected-sentence-separate-tar2-nets'
     writer = SummaryWriter('runs/' + name)
     main(writer, name)

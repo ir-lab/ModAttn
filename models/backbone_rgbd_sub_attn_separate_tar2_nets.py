@@ -368,12 +368,22 @@ class Backbone(nn.Module):
         self.attn3 = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=8, device=device, batch_first=True)
         self.attn4 = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=8, device=device, batch_first=True)
 
-        self.embed_to_target_position = nn.Sequential(
+        self.embed_to_target_1_position = nn.Sequential(
             nn.Linear(embedding_size, 128), 
             nn.SELU(), 
             nn.Linear(128, num_traces_out-1))
 
-        self.embed_to_displacement = nn.Sequential(
+        self.embed_to_displacement_1 = nn.Sequential(
+            nn.Linear(embedding_size, 128), 
+            nn.SELU(), 
+            nn.Linear(128, num_traces_out-1))
+        
+        self.embed_to_target_2_position = nn.Sequential(
+            nn.Linear(embedding_size, 128), 
+            nn.SELU(), 
+            nn.Linear(128, num_traces_out-1))
+
+        self.embed_to_displacement_2 = nn.Sequential(
             nn.Linear(embedding_size, 128), 
             nn.SELU(), 
             nn.Linear(128, num_traces_out-1))
@@ -542,10 +552,10 @@ class Backbone(nn.Module):
             cortex_value=cortex_value3, 
             attn_layer=self.attn3)
         # Post-attn operations. Predict the results from the state embedding
-        target_1_position_pred = self.embed_to_target_position(state_embedding3[:, 0, :])
-        target_2_position_pred = self.embed_to_target_position(state_embedding3[:, 5, :])
-        displacement_1_pred = self.embed_to_displacement(state_embedding3[:, 1, :])
-        displacement_2_pred = self.embed_to_displacement(state_embedding3[:, 3, :])
+        target_1_position_pred = self.embed_to_target_1_position(state_embedding3[:, 0, :])
+        target_2_position_pred = self.embed_to_target_2_position(state_embedding3[:, 5, :])
+        displacement_1_pred = self.embed_to_displacement_1(state_embedding3[:, 1, :])
+        displacement_2_pred = self.embed_to_displacement_2(state_embedding3[:, 3, :])
         ee_pos_pred = self.embed_to_ee_pos(state_embedding3[:, 2, :])
         if stage == 1:
             return target_1_position_pred, target_2_position_pred, ee_pos_pred, displacement_1_pred, displacement_2_pred, attn_map, attn_map2, attn_map3

@@ -7,6 +7,20 @@ from torchvision.models import resnet18, resnet50
 import clip
 import contextlib
 
+# For MAE vision encoder
+import sys
+sys.path.append('/home/local/ASUAD/yzhou298/github/mae')
+import models_vit
+
+def prepare_model(chkpt_dir, arch='vit_large_patch16'):
+    # build model
+    model = getattr(models_vit, arch)(global_pool=True)
+    # load model
+    checkpoint = torch.load(chkpt_dir, map_location='cuda')
+    msg = model.load_state_dict(checkpoint['model'], strict=False)
+    print(msg)
+    return model
+
 
 class TaskIDEncoder(nn.Module):
     def __init__(self, num_tasks, embedding_size):
@@ -46,39 +60,6 @@ class ResidualBlock(nn.Module):
         out = self.relu(out)
         return out
 
-
-class ImgEncoder(nn.Module):
-    def __init__(self, img_size=224, ngf=64, channel_multiplier=4, input_nc=3):
-        super(ImgEncoder, self).__init__()
-        self.layer1 = nn.Sequential(nn.ReflectionPad2d((3,3,3,3)),
-                                    nn.Conv2d(input_nc,ngf,kernel_size=7,stride=1),
-                                    nn.InstanceNorm2d(ngf),
-                                    nn.ReLU(True))
-        
-        self.layer2 = nn.Sequential(nn.Conv2d(ngf,ngf*channel_multiplier//2,kernel_size=3,stride=2,padding=1),
-                                   nn.InstanceNorm2d(ngf*channel_multiplier//2),
-                                   nn.ReLU(True))
-        
-        self.layer3 = nn.Sequential(nn.Conv2d(ngf*channel_multiplier // 2,ngf*channel_multiplier,kernel_size=3,stride=2,padding=1),
-                                   nn.InstanceNorm2d(ngf*channel_multiplier),
-                                   nn.ReLU(True))
-
-        self.layer4 = nn.Sequential(nn.Conv2d(ngf*channel_multiplier,ngf*channel_multiplier,kernel_size=3,stride=2,padding=1),
-                                   nn.InstanceNorm2d(ngf*channel_multiplier),
-                                   nn.ReLU(True))
-
-        self.layer5 = nn.Sequential(ResidualBlock(ngf*channel_multiplier,ngf*channel_multiplier),
-                                    ResidualBlock(ngf*channel_multiplier,ngf*channel_multiplier),
-                                    ResidualBlock(ngf*channel_multiplier,ngf*channel_multiplier))
-        
-    def forward(self, x):
-        x = x.permute(0, 3, 1, 2)
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = self.layer5(out)
-        return out
 
 
 # https://github.com/aliutkus/torchinterp1d/blob/master/torchinterp1d/interp1d.py
@@ -281,7 +262,8 @@ class JointsEncoder(nn.Module):
 
 # Some code from DETR
 class Backbone(nn.Module):
-    def __init__(self, img_size, embedding_size, num_traces_in=7, num_traces_out=10, num_weight_points=91, input_nc=4, device=torch.device('cuda')):
+    def __init__(self, img_size, embedding_size, num_traces_in=7, num_traces_out=10, num_weight_points=91, 
+        vision_feat_dim=1024, device=torch.device('cuda')):
         super(Backbone, self).__init__()
 
         self.device = device
@@ -290,9 +272,8 @@ class Backbone(nn.Module):
         self.num_weight_points = num_weight_points
 
         # Visual Pathway
-        self.visual_encoder = ImgEncoder(input_nc=input_nc)
         self.visual_encoder_narrower = nn.Sequential(
-            nn.Linear(256, embedding_size),
+            nn.Linear(vision_feat_dim, embedding_size),
             nn.ReLU())
         self.img_embed_merge_pos_embed = nn.Sequential(
             nn.Linear(embedding_size + 2, embedding_size),
@@ -368,12 +349,22 @@ class Backbone(nn.Module):
         self.attn3 = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=8, device=device, batch_first=True)
         self.attn4 = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=8, device=device, batch_first=True)
 
-        self.embed_to_target_position = nn.Sequential(
+        self.embed_to_target_1_position = nn.Sequential(
             nn.Linear(embedding_size, 128), 
             nn.SELU(), 
             nn.Linear(128, num_traces_out-1))
 
-        self.embed_to_displacement = nn.Sequential(
+        self.embed_to_displacement_1 = nn.Sequential(
+            nn.Linear(embedding_size, 128), 
+            nn.SELU(), 
+            nn.Linear(128, num_traces_out-1))
+        
+        self.embed_to_target_2_position = nn.Sequential(
+            nn.Linear(embedding_size, 128), 
+            nn.SELU(), 
+            nn.Linear(128, num_traces_out-1))
+
+        self.embed_to_displacement_2 = nn.Sequential(
             nn.Linear(embedding_size, 128), 
             nn.SELU(), 
             nn.Linear(128, num_traces_out-1))
@@ -386,7 +377,6 @@ class Backbone(nn.Module):
         self.controller = Controller(num_traces=num_traces_out, num_weight_points=num_weight_points, embedding_size=embedding_size)
 
         self.fixed = nn.ModuleList([
-            self.visual_encoder,
             self.visual_encoder_narrower,
             self.img_embed_merge_pos_embed,
             self.task_id_encoder,
@@ -402,12 +392,13 @@ class Backbone(nn.Module):
         return q, k, v
 
     def _img_pathway_(self, img):
-        # Comprehensive Visual Encoder. img_embedding is the square token list
-        img_embedding = self.visual_encoder(img)
+        img_embedding = img
 
         # Merge H and W dimensions
-        _, _, H, W = img_embedding.shape
-        img_embedding = img_embedding.reshape(img_embedding.shape[0], img_embedding.shape[1], -1).permute(0, 2, 1)
+        N, L, D = img_embedding.shape
+        H = 14
+        W = 14
+        # img_embedding = img_embedding.reshape(img_embedding.shape[0], img_embedding.shape[1], -1).permute(0, 2, 1)
 
         # Narrow the embedding size
         img_embedding = self.visual_encoder_narrower(img_embedding)
@@ -542,10 +533,10 @@ class Backbone(nn.Module):
             cortex_value=cortex_value3, 
             attn_layer=self.attn3)
         # Post-attn operations. Predict the results from the state embedding
-        target_1_position_pred = self.embed_to_target_position(state_embedding3[:, 0, :])
-        target_2_position_pred = self.embed_to_target_position(state_embedding3[:, 5, :])
-        displacement_1_pred = self.embed_to_displacement(state_embedding3[:, 1, :])
-        displacement_2_pred = self.embed_to_displacement(state_embedding3[:, 3, :])
+        target_1_position_pred = self.embed_to_target_1_position(state_embedding3[:, 0, :])
+        target_2_position_pred = self.embed_to_target_2_position(state_embedding3[:, 5, :])
+        displacement_1_pred = self.embed_to_displacement_1(state_embedding3[:, 1, :])
+        displacement_2_pred = self.embed_to_displacement_2(state_embedding3[:, 3, :])
         ee_pos_pred = self.embed_to_ee_pos(state_embedding3[:, 2, :])
         if stage == 1:
             return target_1_position_pred, target_2_position_pred, ee_pos_pred, displacement_1_pred, displacement_2_pred, attn_map, attn_map2, attn_map3

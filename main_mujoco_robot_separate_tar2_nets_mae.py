@@ -1,7 +1,7 @@
 import numpy as np
 # np.set_printoptions(precision=3, suppress=True)
-from models.backbone_rgbd_sub_attn import Backbone
-from utils.load_data_rgb_abs_action_fast_gripper_finetuned_attn import DMPDatasetEERandTarXYLang, pad_collate_xy_lang
+from models.backbone_rgbd_sub_attn_separate_tar2_nets_mae import Backbone
+from utils.load_data_rgb_abs_action_fast_gripper_finetuned_attn_mae import DMPDatasetEERandTarXYLang, pad_collate_xy_lang
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 import torch.nn as nn
@@ -23,7 +23,7 @@ else:
 
 
 def pixel_position_to_attn_index(pixel_position, attn_map_offset=1):
-    index = (pixel_position[:, 0]) // 8 + attn_map_offset + 28 * (pixel_position[:, 1] // 8)
+    index = (pixel_position[:, 0]) // 16 + attn_map_offset + 14 * (pixel_position[:, 1] // 16)
     index = index.astype(int)
     index = torch.tensor(index).to(device).unsqueeze(1)
     return index
@@ -66,7 +66,7 @@ def train(writer, name, epoch_idx, data_loader, model,
         mask = mask.to(device)
         attn_index_tar_1 = pixel_position_to_attn_index(target_1_xy, attn_map_offset=6)
         attn_index_tar_2 = pixel_position_to_attn_index(target_2_xy, attn_map_offset=6)
-        attn_index_ee = pixel_position_to_attn_index(ee_xy, attn_map_offset=5)
+        attn_index_ee = pixel_position_to_attn_index(ee_xy, attn_map_offset=6)
         sentence = sentence.to(device)
         joint_angles_traj = joint_angles_traj.to(device)
         ee_traj = torch.cat((ee_traj, joint_angles_traj[:, -1:, :]), axis=1)
@@ -415,7 +415,7 @@ def main(writer, name, batch_size=96):
     ckpt = None
 
     # load model
-    model = Backbone(img_size=224, embedding_size=192, num_traces_in=7, num_traces_out=10, num_weight_points=12, input_nc=3)
+    model = Backbone(img_size=224, embedding_size=192, num_traces_in=7, num_traces_out=10, num_weight_points=12)
     if ckpt is not None:
         model.load_state_dict(torch.load(ckpt), strict=True)
 
@@ -489,6 +489,6 @@ def main(writer, name, batch_size=96):
 
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-corrected-sentence'
+    name = 'train-rgb-sub-attn-abs-action-separate-tar2-nets-mae'
     writer = SummaryWriter('runs/' + name)
     main(writer, name)

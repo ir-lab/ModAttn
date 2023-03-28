@@ -1,7 +1,7 @@
 import numpy as np
 # np.set_printoptions(precision=3, suppress=True)
-from models.backbone_rgbd_sub_attn import Backbone
-from utils.load_data_rgb_abs_action_fast_gripper_finetuned_attn import DMPDatasetEERandTarXYLang, pad_collate_xy_lang
+from models.backbone_rgbd_sub_attn_separate_tar2_nets_vision_embed import Backbone
+from utils.load_data_rgb_abs_action_fast_gripper_finetuned_attn_vision_embed import DMPDatasetEERandTarXYLang, pad_collate_xy_lang
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 import torch.nn as nn
@@ -23,7 +23,7 @@ else:
 
 
 def pixel_position_to_attn_index(pixel_position, attn_map_offset=1):
-    index = (pixel_position[:, 0]) // 8 + attn_map_offset + 28 * (pixel_position[:, 1] // 8)
+    index = (pixel_position[:, 0]) // 16 + attn_map_offset + 14 * (pixel_position[:, 1] // 16)
     index = index.astype(int)
     index = torch.tensor(index).to(device).unsqueeze(1)
     return index
@@ -66,7 +66,7 @@ def train(writer, name, epoch_idx, data_loader, model,
         mask = mask.to(device)
         attn_index_tar_1 = pixel_position_to_attn_index(target_1_xy, attn_map_offset=6)
         attn_index_tar_2 = pixel_position_to_attn_index(target_2_xy, attn_map_offset=6)
-        attn_index_ee = pixel_position_to_attn_index(ee_xy, attn_map_offset=5)
+        attn_index_ee = pixel_position_to_attn_index(ee_xy, attn_map_offset=6)
         sentence = sentence.to(device)
         joint_angles_traj = joint_angles_traj.to(device)
         ee_traj = torch.cat((ee_traj, joint_angles_traj[:, -1:, :]), axis=1)
@@ -183,11 +183,11 @@ def train(writer, name, epoch_idx, data_loader, model,
         # Log and print
         writer.add_scalar('train/all_loss', loss.item(), global_step=epoch_idx * len(data_loader) + idx)
         if stage == 0:
-            print(f'epoch {epoch_idx}, step {idx}, stage {stage}, l_all {loss.item():.2f}')
+            print(f'epoch {epoch_idx}/{len(data_loader)}, step {idx}, stage {stage}, l_all {loss.item():.2f}')
         elif stage == 1:
-            print(f'epoch {epoch_idx}, step {idx}, stage {stage}, l_all {loss.item():.2f}, l0 {(loss01 + loss02).item():.2f}, l1 {(loss11 + loss12).item():.2f}, l2 {loss2.item():.2f}')
+            print(f'epoch {epoch_idx}/{len(data_loader)}, step {idx}, stage {stage}, l_all {loss.item():.2f}, l0 {(loss01 + loss02).item():.2f}, l1 {(loss11 + loss12).item():.2f}, l2 {loss2.item():.2f}')
         else:
-            print(f'epoch {epoch_idx}, step {idx}, stage {stage}, l_all {loss.item():.2f}, l0 {(loss01 + loss02).item():.2f}, l1 {(loss11 + loss12).item():.2f}, l2 {loss2.item():.2f}, l4 {loss4.item():.2f}')
+            print(f'epoch {epoch_idx}/{len(data_loader)}, step {idx}, stage {stage}, l_all {loss.item():.2f}, l0 {(loss01 + loss02).item():.2f}, l1 {(loss11 + loss12).item():.2f}, l2 {loss2.item():.2f}, l4 {loss4.item():.2f}')
 
         # Print Attention Map
         if print_attention_map:
@@ -406,8 +406,10 @@ def test(writer, name, epoch_idx, data_loader, model, criterion, train_dataset_s
 
 
 def main(writer, name, batch_size=96):
-    train_set_path = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/put_right_to/split1'
-    val_set_path = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/put_right_to/split2'
+    # train_set_path = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/put_right_to/split1'
+    # val_set_path = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/put_right_to/split2'
+    train_set_path = 'extended_modattn/put_right_to/split1'
+    val_set_path = 'extended_modattn/put_right_to/split2'
     ckpt_path = '/home/local/ASUAD/yzhou298/Documents/ckpts/put_right_to'
     save_ckpt = True
     supervised_attn = True
@@ -415,7 +417,7 @@ def main(writer, name, batch_size=96):
     ckpt = None
 
     # load model
-    model = Backbone(img_size=224, embedding_size=192, num_traces_in=7, num_traces_out=10, num_weight_points=12, input_nc=3)
+    model = Backbone(img_size=224, embedding_size=192, num_traces_in=7, num_traces_out=10, num_weight_points=12)
     if ckpt is not None:
         model.load_state_dict(torch.load(ckpt), strict=True)
 
@@ -427,21 +429,21 @@ def main(writer, name, batch_size=96):
     ]
     dataset_train = DMPDatasetEERandTarXYLang(data_dirs, random=True, length_total=120)
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size,
-                                          shuffle=True, num_workers=8,
+                                          shuffle=True, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
     dataset_test = DMPDatasetEERandTarXYLang([val_set_path], random=True, length_total=120)
     data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size,
-                                          shuffle=True, num_workers=8,
+                                          shuffle=True, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
     print('stage 0 and 1 dataset loaded')
     
     dataset_train_dmp = DMPDatasetEERandTarXYLang(data_dirs, random=False, length_total=120)
     data_loader_train_dmp = torch.utils.data.DataLoader(dataset_train_dmp, batch_size=batch_size,
-                                          shuffle=True, num_workers=8,
+                                          shuffle=True, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
     dataset_test_dmp = DMPDatasetEERandTarXYLang([val_set_path], random=False, length_total=120)
     data_loader_test_dmp = torch.utils.data.DataLoader(dataset_test_dmp, batch_size=batch_size,
-                                          shuffle=True, num_workers=8,
+                                          shuffle=True, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
     print('stage  dataset loaded')
 
@@ -489,6 +491,6 @@ def main(writer, name, batch_size=96):
 
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-corrected-sentence'
+    name = 'train-rgb-sub-attn-abs-action-separate-tar2-nets-vision-embed'
     writer = SummaryWriter('runs/' + name)
     main(writer, name)
