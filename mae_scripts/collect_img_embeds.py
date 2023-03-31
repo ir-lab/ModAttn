@@ -10,11 +10,10 @@ import bisect
 import clip
 import random
 from PIL import Image
+import argparse
 
 # For MAE vision encoder
 import sys
-sys.path.append('/home/local/ASUAD/yzhou298/github/mae')
-import models_vit
 
 def prepare_model(chkpt_dir, arch='vit_large_patch16'):
     # build model
@@ -124,18 +123,36 @@ def pad_collate_xy_lang(batch):
 if __name__ == '__main__':
     data_dirs = [
         'extended_modattn/put_right_to/split1',
-        # 'extended_modattn/put_right_to/split2'
+        'extended_modattn/put_right_to/split2'
     ]
-    source_root = '/home/local/ASUAD/yzhou298/Documents/dataset/'
-    target_root = '/media/yzhou298/e/'
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--source_root', default='/home/local/ASUAD/yzhou298/Documents/dataset/')
+    parser.add_argument('--target_root', default='/media/yzhou298/e/')
+    parser.add_argument('--chkpt_dir', default='./mae_pretrain_vit_large.pth')
+    parser.add_argument('--arch', default='vit_large_patch16')
+    parser.add_argument('--mae_folder', default='/home/local/ASUAD/yzhou298/github/mae')
+    args = parser.parse_args()
+
+    # source_root = '/home/local/ASUAD/yzhou298/Documents/dataset/'
+    # target_root = '/media/yzhou298/e/'
+    # chkpt_dir='./mae_pretrain_vit_large.pth'
+    # arch='vit_large_patch16'
+
+    source_root = args.source_root
+    target_root = args.target_root
+    chkpt_dir = args.chkpt_dir
+    mae_folder = args.mae_folder
+    arch = args.arch
+
+
+    sys.path.append(mae_folder)
+
+    import models_vit
     dataset = DMPDatasetEERandTarXYLang(data_dirs, source_root, target_root)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=384,
                                           shuffle=False, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
-
-
-    chkpt_dir='./mae_pretrain_vit_large.pth'
-    arch='vit_large_patch16'
     visual_encoder = ImgEncoder(chkpt_dir, arch).to('cuda')
 
     for idx, (img, img_path, npy_path) in enumerate(dataloader):
@@ -153,5 +170,6 @@ if __name__ == '__main__':
         for i in range(img_embedding.shape[0]):
             folder = r'/' + r'/'.join(npy_path[i].split(r'/')[:-1])
             if not os.path.exists(folder):
-                os.mkdir(folder)
+                # os.mkdir(folder)
+                os.system(f'mkdir -p {folder}')
             np.save(npy_path[i], img_embedding[i])

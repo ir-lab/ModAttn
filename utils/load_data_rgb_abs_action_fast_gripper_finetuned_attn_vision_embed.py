@@ -11,10 +11,9 @@ import clip
 import random
 import cv2
 from PIL import Image
+import sys
 
 # For MAE vision encoder
-import sys
-sys.path.append('/home/local/ASUAD/yzhou298/github/mae')
 import models_vit
 
 def prepare_model(chkpt_dir, arch='vit_large_patch16'):
@@ -56,6 +55,8 @@ class DMPDatasetEERandTarXYLang(Dataset):
         assert normalize in ['separate', 'together', 'none', 'panda', 'jaco2']
 
         self.visual_encoder = None
+        self.chkpt_dir = chkpt_dir
+        self.arch = arch
 
 
         all_dirs = []
@@ -250,13 +251,13 @@ class DMPDatasetEERandTarXYLang(Dataset):
             img = torch.tensor(img, dtype=torch.float32)
         else:
             print(f"file missing: {self.trials[trial_idx]['img_paths_npy'][step_idx]}")
-            folder = r'/' + r'/'.join(npy_path[i].split(r'/')[:-1])
+            folder = r'/' + r'/'.join(self.trials[trial_idx]['img_paths_npy'][step_idx].split(r'/')[:-1])
             
             if not os.path.exists(folder):
-                os.mkdir(folder)
+                os.system(f'mkdir -p {folder}')
             
             if self.visual_encoder is None:
-                self.visual_encoder = ImgEncoder(chkpt_dir, arch)
+                self.visual_encoder = ImgEncoder(self.chkpt_dir, self.arch)
             
             img = np.array(Image.open(self.trials[trial_idx]['img_paths'][step_idx]))[:,:,:3] / 255.
             img = img - imagenet_mean

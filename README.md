@@ -49,6 +49,37 @@ python main_mujoco_robot.py /path/to/train/set /path/to/val/set /path/to/ckpt/fo
 python main_tiny_lang_robot.py /path/to/train/set /path/to/val/set /path/to/ckpt/folder
 ```
 
+## Training with pretrained MAE vision model
+- Download dataset
+- Prepare the MAE model
+    - Prepare the code:
+     ``` 
+     git clone https://github.com/facebookresearch/mae.git
+     ```
+    - Prepare the pretrained ckpt:
+    ```
+    wget https://dl.fbaipublicfiles.com/mae/pretrain/mae_pretrain_vit_large.pth
+    ```
+- Pre-compute the vision embeddings
+    - cd the folder `mae_scripts`
+    - edit the file `collect_img_embeds.sh`
+        - `source_root` is where the dataset is at
+        - `target_root` is where you want to store the pre-computed embeddings
+        - `chkpt_dir` is where MAE ckpt is at
+        - `mae_folder` is MAE's code folder
+    - run this bash file
+
+- Start training
+    - Go to the root folder
+    - edit the file train.sh to indicate the file locations. 3 new arguments:
+        - `train_set_path` is relative path of the split1 data. `source_root + train_set_path` should equal the absolute path to the folder `split1`
+        - `val_set_path` is relative path of the split2 data. same as above
+        - `ckpt_path` '/home/local/ASUAD/yzhou298/Documents/ckpts/put_right_to' 
+    - run this bash file
+
+
+
+
 # More Visualization of Results
 ## Sim2real Transfer
 <img src="images/sim2real.gif" width="350">
