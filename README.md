@@ -74,7 +74,7 @@ python main_tiny_lang_robot.py /path/to/train/set /path/to/val/set /path/to/ckpt
     - edit the file train.sh to indicate the file locations. 3 new arguments:
         - `train_set_path` is relative path of the split1 data. `source_root + train_set_path` should equal the absolute path to the folder `split1`
         - `val_set_path` is relative path of the split2 data. same as above
-        - `ckpt_path` '/home/local/ASUAD/yzhou298/Documents/ckpts/put_right_to' 
+        - `ckpt_path` is where you want to store the ckpts 
     - run this bash file
 
 
