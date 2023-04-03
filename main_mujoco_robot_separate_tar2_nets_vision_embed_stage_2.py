@@ -469,19 +469,19 @@ def main(writer, name, batch_size=96):
                                           shuffle=True, num_workers=16,
                                           collate_fn=pad_collate_xy_lang)
 
-    # dataset_train_dmp = DMPDatasetEERandTarXYLang(data_dirs, random=False, length_total=120,
-    #     source_root = data_source_root,
-    #     target_root = data_target_root)
-    # data_loader_train_dmp = torch.utils.data.DataLoader(dataset_train_dmp, batch_size=batch_size,
-    #                                       shuffle=True, num_workers=16,
-    #                                       collate_fn=pad_collate_xy_lang)
+    dataset_train_dmp = DMPDatasetEERandTarXYLang(data_dirs, random=False, length_total=120,
+        source_root = data_source_root,
+        target_root = data_target_root)
+    data_loader_train_dmp = torch.utils.data.DataLoader(dataset_train_dmp, batch_size=batch_size,
+                                          shuffle=True, num_workers=16,
+                                          collate_fn=pad_collate_xy_lang)
                                           
-    # dataset_test_dmp = DMPDatasetEERandTarXYLang([val_set_path], random=False, length_total=120, 
-    #     source_root = data_source_root,
-    #     target_root = data_target_root)
-    # data_loader_test_dmp = torch.utils.data.DataLoader(dataset_test_dmp, batch_size=batch_size,
-    #                                       shuffle=True, num_workers=16,
-    #                                       collate_fn=pad_collate_xy_lang)
+    dataset_test_dmp = DMPDatasetEERandTarXYLang([val_set_path], random=False, length_total=120, 
+        source_root = data_source_root,
+        target_root = data_target_root)
+    data_loader_test_dmp = torch.utils.data.DataLoader(dataset_test_dmp, batch_size=batch_size,
+                                          shuffle=True, num_workers=16,
+                                          collate_fn=pad_collate_xy_lang)
     print('stage  dataset loaded')
 
 
@@ -514,9 +514,15 @@ def main(writer, name, batch_size=96):
                 criterion, ckpt_path, save_ckpt, loss_stage, supervised_attn=supervised_attn, curriculum_learning=curriculum_learning, print_attention_map=False)
             if whether_test:
                 test(writer, name, i + 1, data_loader_test, model, criterion, len(data_loader_train), loss_stage, print_attention_map=False)
+        else:
+            loss_stage = train(writer, name, i, data_loader_train_dmp, model, optimizer, scheduler,
+                criterion, ckpt_path, save_ckpt, loss_stage, supervised_attn=supervised_attn, curriculum_learning=curriculum_learning, print_attention_map=False)
+            if whether_test:
+                test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train_dmp), loss_stage, print_attention_map=False)
+
         if i >= 10:
             loss_stage = 1
-        if i >= 30:
+        if i >= 160:
             loss_stage = 2
 
 
