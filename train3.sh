@@ -1,0 +1,11 @@
+python main_mujoco_robot_separate_tar2_nets_vision_embed_no_stage.py \
+    --data_source_root '/home/local/ASUAD/yzhou298/Documents/dataset/' \
+    --data_target_root '/media/yzhou298/e/' \
+    --train_set_path 'extended_modattn/put_right_to/split1' \
+    --val_set_path 'extended_modattn/put_right_to/split2' \
+    --ckpt_path '/home/local/ASUAD/yzhou298/Documents/ckpts/put_right_to' \
+    --save_ckpt \
+    --supervised_attn \
+    --curriculum_learning \
+    --ckpt None \
+    --mae_root '/home/local/ASUAD/yzhou298/github/mae'
