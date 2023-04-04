@@ -479,11 +479,11 @@ def main(writer, name, batch_size=96):
     # train n epoches
     loss_stage = 0
     for i in range(0, 300):
-        # whether_test = ((i % 5) == 0)
-        # loss_stage = train(writer, name, i, data_loader_train, data_loader_train_dmp, model, optimizer, scheduler,
-        #     criterion, ckpt_path, save_ckpt, loss_stage, supervised_attn=supervised_attn, curriculum_learning=curriculum_learning, print_attention_map=False)
-        # if whether_test:
-        test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train), 2, print_attention_map=False)
+        whether_test = ((i % 5) == 0)
+        loss_stage = train(writer, name, i, data_loader_train, data_loader_train_dmp, model, optimizer, scheduler,
+            criterion, ckpt_path, save_ckpt, loss_stage, supervised_attn=supervised_attn, curriculum_learning=curriculum_learning, print_attention_map=False)
+        if whether_test:
+            test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train), 2, print_attention_map=False)
 
 
 if __name__ == '__main__':
