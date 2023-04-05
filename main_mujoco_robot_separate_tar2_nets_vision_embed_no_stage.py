@@ -181,7 +181,7 @@ def train(writer, name, epoch_idx, data_loader, data_loader_dmp, model,
         if save_ckpt:
             if not os.path.isdir(os.path.join(ckpt_path, name)):
                 os.mkdir(os.path.join(ckpt_path, name))
-            if global_step % 10000 == 0 or (global_step + 1) % 10000:
+            if global_step % 10000 == 0 or (global_step + 1) % 10000 == 0:
                 checkpoint = {
                     'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
