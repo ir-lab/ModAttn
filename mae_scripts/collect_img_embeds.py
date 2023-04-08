@@ -121,11 +121,6 @@ def pad_collate_xy_lang(batch):
 
 
 if __name__ == '__main__':
-    data_dirs = [
-        'extended_modattn/put_right_to/split1',
-        'extended_modattn/put_right_to/split2'
-    ]
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--source_root', default='/home/local/ASUAD/yzhou298/Documents/dataset/')
     parser.add_argument('--target_root', default='/media/yzhou298/e/')
