@@ -144,6 +144,9 @@ if __name__ == '__main__':
     chkpt_dir = args.chkpt_dir
     mae_folder = args.mae_folder
     arch = args.arch
+    data_dirs = []
+    for folder in [x for x in os.listdir(source_root) if os.path.isdir(os.path.join(source_root, x))]:
+        data_dirs.append(folder)
 
 
     sys.path.append(mae_folder)
