@@ -226,11 +226,57 @@ class DMPDatasetEERandTarXYLang(Dataset):
         sentence = f'put {self.noun_phrase_template(target_1_id)} to the right of {self.noun_phrase_template(target_2_id)}'
         return sentence.strip()
 
-    def xyz_to_xy(self, xyz):
-        # x: left to right
-        # y: top to down
-        xy = np.dot(xyz, self.weight) + self.bias
-        return xy
+    def xyz_to_xy(self, xyz, cam_pos=np.array([0, 1.5, 1]), theta=np.array([-1, 0, 3.14]), fov=60, output_size_x=224, output_size_y=224):
+        """
+        https://github.com/yusukeurakami/mujoco_2d_projection
+        :param a: 3D coordinates of the joint in nparray [m]
+        :param c: 3D coordinates of the camera in nparray [m]
+        :param theta: camera 3D rotation (Rotation order of x->y->z) in nparray [rad]
+        :param fov: field of view in integer [degree]
+        :param e: 
+        :return:
+            - (bx, by) ==> 2D coordinates of the obj [pixel]
+            - d ==> 3D coordinates of the joint (relative to the camera) [m]
+        """
+        e = 1
+        output_size_x = output_size_x / 2
+        output_size_y = output_size_y / 2
+        # Get the vector from camera to object in global coordinate.
+        ac_diff = xyz - cam_pos
+
+        # Rotate the vector in to camera coordinate
+        if not hasattr(self, 'transform'):
+            self.transform = None
+        if self.transform is None:
+            x_rot = np.array([[1 ,0, 0],
+                            [0, np.cos(theta[0]), np.sin(theta[0])],
+                            [0, -np.sin(theta[0]), np.cos(theta[0])]])
+
+            y_rot = np.array([[np.cos(theta[1]) ,0, -np.sin(theta[1])],
+                        [0, 1, 0],
+                        [np.sin(theta[1]), 0, np.cos(theta[1])]])
+
+            z_rot = np.array([[np.cos(theta[2]) ,np.sin(theta[2]), 0],
+                        [-np.sin(theta[2]), np.cos(theta[2]), 0],
+                        [0, 0, 1]])
+
+            transform = z_rot.dot(y_rot.dot(x_rot))
+            self.transform = transform
+        transform = self.transform
+        d = transform.dot(ac_diff)    
+
+        # scaling of projection plane using fov
+        fov_rad = np.deg2rad(fov)    
+        e *= output_size_y*1/np.tan(fov_rad/2.0)
+
+        # Projection from d to 2D
+        bx = e*d[0]/(d[2]) + output_size_x
+        by = e*d[1]/(d[2]) + output_size_y
+        # bx = output_size_x - bx
+        bx = output_size_x * 2 - bx
+
+        # return (bx, by), d
+        return np.array([bx, by])
 
     def __len__(self):
         return self.lengths_index[-1]
