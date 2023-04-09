@@ -244,7 +244,14 @@ class DMPDatasetEERandTarXYLang(Dataset):
         by = e*d[1]/(d[2]) + output_size_y
         # bx = output_size_x - bx
         bx = output_size_x * 2 - bx
-
+        if bx < 0:
+            bx = 0
+        if bx >= output_size_x * 2:
+            bx = output_size_x * 2 - 1
+        if by < 0:
+            by = 0
+        if by >= output_size_y * 2:
+            by = output_size_y * 2 - 1
         # return (bx, by), d
         return np.array([bx, by])
 
