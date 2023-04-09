@@ -486,9 +486,9 @@ def main(writer, name, batch_size=96):
         if whether_test:
             test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train), loss_stage, print_attention_map=False)
         
-        if i > 10:
+        if i > 5:
             loss_stage = 1
-        if i > 160:
+        if i > 65:
             loss_stage = 2
 
 if __name__ == '__main__':

@@ -129,10 +129,6 @@ if __name__ == '__main__':
     parser.add_argument('--mae_folder', default='/home/local/ASUAD/yzhou298/github/mae')
     args = parser.parse_args()
 
-    # source_root = '/home/local/ASUAD/yzhou298/Documents/dataset/'
-    # target_root = '/media/yzhou298/e/'
-    # chkpt_dir='./mae_pretrain_vit_large.pth'
-    # arch='vit_large_patch16'
 
     source_root = args.source_root
     target_root = args.target_root

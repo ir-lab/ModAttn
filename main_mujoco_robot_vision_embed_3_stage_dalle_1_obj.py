@@ -439,7 +439,7 @@ def main(writer, name, batch_size=96):
         
         if i > 10:
             loss_stage = 1
-        if i > 160:
+        if i > 115:
             loss_stage = 2
 
 
