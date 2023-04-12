@@ -492,6 +492,6 @@ def main(writer, name, batch_size=96):
             loss_stage = 2
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-vision-embed-no-stage-dalle-2-obj'
+    name = 'train-rgb-sub-attn-abs-action-vision-embed-3-stage-dalle-2-obj'
     writer = SummaryWriter('runs/' + name)
     main(writer, name)

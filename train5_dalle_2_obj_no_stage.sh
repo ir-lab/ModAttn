@@ -1,3 +1,4 @@
+export CUDA_VISIBLE_DEVICES=0
 python main_mujoco_robot_vision_embed_no_stage_dalle_2_obj.py \
     --data_source_root '/home/yzhou298/data/part3/put_left_right_to/' \
     --data_target_root '/home/yzhou298/data2/part3_mae/put_left_right_to/' \
