@@ -417,7 +417,7 @@ def test(writer, name, epoch_idx, data_loader, model, criterion, train_dataset_s
                 writer.add_scalar('train_split/error_gripper', error_gripper / num_grippoints, global_step=epoch_idx * train_dataset_size)
 
 
-def main(writer, name, batch_size=96):
+def main(batch_size=96):
     parser = argparse.ArgumentParser(description='Description of your program')
     parser.add_argument('--data_source_root', default='/home/local/ASUAD/yzhou298/Documents/dataset/')
     parser.add_argument('--data_target_root', default='/media/yzhou298/e/')
@@ -429,6 +429,7 @@ def main(writer, name, batch_size=96):
     parser.add_argument('--curriculum_learning', action='store_true')
     parser.add_argument('--ckpt', default=None)
     parser.add_argument('--mae_root', default='/home/local/ASUAD/yzhou298/github/mae')
+    parser.add_argument('--name', default='train-rgb-sub-attn-abs-action-vision-embed-3-stage-dalle-2-obj-fov40')
     args = parser.parse_args()
 
     # data_source_root = '/home/local/ASUAD/yzhou298/Documents/dataset/'
@@ -452,8 +453,10 @@ def main(writer, name, batch_size=96):
     curriculum_learning = args.curriculum_learning
     ckpt = args.ckpt
     mae_root = args.mae_root
+    name = args.name
 
     sys.path.append(mae_root)
+    writer = SummaryWriter('runs/' + name)
 
     # load model
     model = Backbone(img_size=224, embedding_size=192, num_traces_in=7, num_traces_out=10, num_weight_points=12)
@@ -525,6 +528,4 @@ def main(writer, name, batch_size=96):
 
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-vision-embed-3-stage-dalle-2-obj-fov40'
-    writer = SummaryWriter('runs/' + name)
-    main(writer, name)
+    main()
