@@ -31,23 +31,6 @@ class DMPDatasetEERandTarXYLang(Dataset):
 
         assert normalize in ['separate', 'together', 'none', 'panda', 'jaco2']
 
-        self.mean = np.array([ 2.97563984e-02,  4.47217117e-01,  8.45049397e-02, 0, 0, 0, 0, 0, 0])
-        self.var = np.array([4.52914246e-02, 5.01675921e-03, 4.19371463e-03, 1, 1, 1, 1, 1, 1])
-        self.mean_joints = np.array([-2.26736831e-01, 5.13238925e-01, -1.84928474e+00, 7.77270127e-01, 1.34229937e+00, 1.39107280e-03, 2.12295943e-01])
-        self.var_joints = np.array([1.41245676e-01, 3.07248648e-02, 1.34113984e-01, 6.87947763e-02, 1.41992804e-01, 7.84910314e-05, 5.66411791e-02])
-        self.mean_joints_together = 0.07375253452255098
-        self.var_joints_together = 1.1682192251792096
-        self.mean_joints_panda = np.array([-0.00357743, 0.29354134, 0.03703507, -2.01260356, -0.03319358, 0.76566389, 0.05069619, 0.01733641])
-        self.std_joints_panda = np.array([0.07899751, 0.04528939, 0.27887484, 0.10307656, 0.06242473, 0.04195134, 0.27607541, 0.00033524]) ** (1/2)
-        self.mean_joints_jaco = np.array([1.55675253, 4.4066693, 1.15504435, 1.71089821, 2.93128305, 1.74011258, 0.04558132])
-        self.std_joints_jaco = np.array([0.29413278, 0.03133729, 0.33075052, 0.36203287, 1.37433513, 0.74981066, 1.17590218]) ** (1/2)
-
-        self.mean_displacement = np.array([2.53345831e-01, 1.14758266e-01, -6.98193015e-02, 0, 0, 0, 0, 0, 0])
-        self.std_displacement = np.array([7.16058815e-02, 5.89546881e-02, 6.53571811e-02, 1, 1, 1, 1, 1, 1])
-
-        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
-        self.imagenet_std = np.array([0.229, 0.224, 0.225])
-
         self.visual_encoder = None
         self.chkpt_dir = chkpt_dir
         self.arch = arch
@@ -68,9 +51,13 @@ class DMPDatasetEERandTarXYLang(Dataset):
 
 
         self.action_inst_to_verb = {
-            'push': ['push', 'move', 'nudge'],
-            'pick': ['pick', 'pick up', 'raise', 'hold'],
-            'rotate': ['rotate', 'revolve', 'spin']
+            'left_to': ['move', 'put', 'get', 'place'],
+            'right_to': ['move', 'put', 'get', 'place']
+        }
+
+        self.action_inst_to_adv = {
+            'left_to': ['to the left of', 'left to'],
+            'right_to': ['to the right of', 'right to']
         }
 
         length = 0
@@ -95,10 +82,8 @@ class DMPDatasetEERandTarXYLang(Dataset):
             trial_dict['joint_angles'] = np.asarray([states_dict[i]['q'] for i in range(trial_dict['len'])])
             
             trial_dict['objects_to_track'] = {}
-            trial_dict['objects_to_track_xy'] = {}
             for object_type in states_dict[0]['objects_to_track']:
                 trial_dict['objects_to_track'][object_type] = np.asarray([states_dict[i]['objects_to_track'][object_type]['xyz'] + self.rpy2rrppyy(states_dict[i]['objects_to_track'][object_type]['rpy']) for i in range(trial_dict['len'])])
-                trial_dict['objects_to_track_xy'][object_type] = np.asarray([self.xyz_to_xy(np.array(states_dict[i]['objects_to_track'][object_type]['xyz'])) for i in range(trial_dict['len'])])
             
             trial_dict['displacement'] = {}
             for object_type in states_dict[0]['objects_to_track']:
@@ -109,27 +94,32 @@ class DMPDatasetEERandTarXYLang(Dataset):
             trial_dict['goal_object'] = states_dict[0]['goal_object']
             trial_dict['action_inst'] = states_dict[0]['action_inst']
             
-            
-            ############# Normalization ###############
-            if self.normalize == 'separate':
-                trial_dict['joint_angles'] = (trial_dict['joint_angles'] - self.mean_joints) / (self.var_joints ** (1/2))
-            else:
-                print('Not implemented')
-                exit()
-            for object_type in states_dict[0]['objects_to_track']:
-                trial_dict['objects_to_track'][object_type] = (trial_dict['objects_to_track'][object_type] - self.mean) / (self.var ** (1/2))
-                if object_type != 'EE':
-                    trial_dict['displacement'][object_type] = (trial_dict['displacement'][object_type] - self.mean_displacement) / self.std_displacement
-            
-
             # There are (trial_dict['len']) steps in the trial, which means (trial_dict['len'] + 1) states
             trial_dict['len'] -= 1
             self.trials.append(trial_dict)
             length = length + trial_dict['len']
             self.lengths_index.append(length)
 
+        self.weight = np.array([[-123.1531,  -0.4878,  -7.9859],
+                [-1.5388, 84.6228,  -65.4262]]).T
+        self.bias = np.array([111.9999, 108.1999])
 
+        self.mean = np.array([ 2.97563984e-02,  4.47217117e-01,  8.45049397e-02, 0, 0, 0, 0, 0, 0])
+        self.var = np.array([4.52914246e-02, 5.01675921e-03, 4.19371463e-03, 1, 1, 1, 1, 1, 1])
+        self.mean_joints = np.array([-2.26736831e-01, 5.13238925e-01, -1.84928474e+00, 7.77270127e-01, 1.34229937e+00, 1.39107280e-03, 2.12295943e-01])
+        self.var_joints = np.array([1.41245676e-01, 3.07248648e-02, 1.34113984e-01, 6.87947763e-02, 1.41992804e-01, 7.84910314e-05, 5.66411791e-02])
+        self.mean_joints_together = 0.07375253452255098
+        self.var_joints_together = 1.1682192251792096
+        self.mean_joints_panda = np.array([-0.00357743, 0.29354134, 0.03703507, -2.01260356, -0.03319358, 0.76566389, 0.05069619, 0.01733641])
+        self.std_joints_panda = np.array([0.07899751, 0.04528939, 0.27887484, 0.10307656, 0.06242473, 0.04195134, 0.27607541, 0.00033524]) ** (1/2)
+        self.mean_joints_jaco = np.array([1.55675253, 4.4066693, 1.15504435, 1.71089821, 2.93128305, 1.74011258, 0.04558132])
+        self.std_joints_jaco = np.array([0.29413278, 0.03133729, 0.33075052, 0.36203287, 1.37433513, 0.74981066, 1.17590218]) ** (1/2)
 
+        self.mean_displacement = np.array([2.53345831e-01, 1.14758266e-01, -6.98193015e-02, 0, 0, 0, 0, 0, 0])
+        self.std_displacement = np.array([7.16058815e-02, 5.89546881e-02, 6.53571811e-02, 1, 1, 1, 1, 1, 1])
+
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
+        self.imagenet_std = np.array([0.229, 0.224, 0.225])
 
 
     def rpy2rrppyy(self, rpy):
@@ -192,10 +182,18 @@ class DMPDatasetEERandTarXYLang(Dataset):
         verb = random.choice(self.action_inst_to_verb[action_inst])
         return verb.strip()
 
-    def sentence_template(self, target_obj, action_inst=None):
+    def adv_phrase_template(self, action_inst):
+        if action_inst is None:
+            action_inst = random.choice(list(self.action_inst_to_verb.keys()))
+        adv = random.choice(self.action_inst_to_adv[action_inst])
+        return adv.strip()
+
+    def sentence_template(self, target_1, target_2, action_inst=None):
         sentence = ''
         sentence = sentence + self.verb_phrase_template(action_inst)
-        sentence = sentence + ' ' + self.noun_phrase_template(target_obj)
+        sentence = sentence + ' ' + self.noun_phrase_template(target_1)
+        sentence = sentence + ' ' + self.adv_phrase_template(action_inst)
+        sentence = sentence + ' ' + self.noun_phrase_template(target_2)
         return sentence.strip()
 
     def xyz_to_xy(self, xyz, cam_pos=np.array([0, 1.5, 1]), theta=np.array([-1, 0, 3.14]), fov=40, output_size_x=224, output_size_y=224):
@@ -254,7 +252,6 @@ class DMPDatasetEERandTarXYLang(Dataset):
             by = 0
         if by >= output_size_y * 2:
             by = output_size_y * 2 - 1
-
         # return (bx, by), d
         return np.array([bx, by])
 
@@ -280,28 +277,52 @@ class DMPDatasetEERandTarXYLang(Dataset):
             exit()
 
         length = torch.tensor(self.trials[trial_idx]['len'] - step_idx, dtype=torch.float32)
-        ee_pos = torch.tensor(self.trials[trial_idx]['objects_to_track']['EE'][step_idx], dtype=torch.float32)
-        ee_traj = torch.tensor(self.trials[trial_idx]['objects_to_track']['EE'][step_idx:], dtype=torch.float32)
-        ee_xy = self.trials[trial_idx]['objects_to_track_xy']['EE'][step_idx]
+        ee_pos = torch.tensor((self.trials[trial_idx]['objects_to_track']['EE'][step_idx] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
+        ee_traj = torch.tensor((self.trials[trial_idx]['objects_to_track']['EE'][step_idx:] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
+        ee_xy = self.xyz_to_xy(self.trials[trial_idx]['objects_to_track']['EE'][step_idx][:3])
 
 
         if self.random:
-            target_1 = random.choice(list(self.trials[trial_idx]['displacement'].keys()))
+            target_1, target_2 = random.sample(list(self.trials[trial_idx]['displacement'].keys()), 2)
             action = None
         else:
-            target_1 = self.trials[trial_idx]['goal_object']
+            target_1 = self.trials[trial_idx]['goal_object'][0]
+            target_2 = self.trials[trial_idx]['goal_object'][1]
             action = self.trials[trial_idx]['action_inst']
 
-        sentence = self.sentence_template(target_1, action)
+        sentence = self.sentence_template(target_1, target_2, action)
         sentence = clip.tokenize([sentence])
 
-        target_1_pos = torch.tensor(self.trials[trial_idx]['objects_to_track'][target_1][step_idx], dtype=torch.float32)
-        target_1_xy = self.trials[trial_idx]['objects_to_track_xy'][target_1][step_idx]
-        displacement_1 = torch.tensor(self.trials[trial_idx]['displacement'][target_1][step_idx], dtype=torch.float32)
-        target_1 = torch.tensor(0, dtype=torch.int64)
+        # target_1_pos = torch.tensor((self.trials[trial_idx]['objects_to_track'][target_1][step_idx] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
+        # target_1_xy = self.xyz_to_xy(self.trials[trial_idx]['objects_to_track'][target_1][step_idx][:3])
+        # displacement_1 = torch.tensor((self.trials[trial_idx]['displacement'][target_1][step_idx] - self.mean_displacement) / self.std_displacement, dtype=torch.float32)
+        # target_1 = torch.tensor(0, dtype=torch.int64)
 
-        joint_angles = torch.tensor(self.trials[trial_idx]['joint_angles'][step_idx], dtype=torch.float32)
-        joint_angles_traj = torch.tensor(self.trials[trial_idx]['joint_angles'][step_idx:], dtype=torch.float32)
+        target_1_pos = torch.tensor((self.trials[trial_idx]['objects_to_track'][target_1][step_idx] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
+        target_2_pos = torch.tensor((self.trials[trial_idx]['objects_to_track'][target_2][step_idx] - self.mean) / (self.var ** (1/2)), dtype=torch.float32)
+        target_1_xy = self.xyz_to_xy(self.trials[trial_idx]['objects_to_track'][target_1][step_idx][:3])
+        target_2_xy = self.xyz_to_xy(self.trials[trial_idx]['objects_to_track'][target_2][step_idx][:3])
+        displacement_1 = torch.tensor((self.trials[trial_idx]['displacement'][target_1][step_idx] - self.mean_displacement) / self.std_displacement, dtype=torch.float32)
+        displacement_2 = torch.tensor((self.trials[trial_idx]['displacement'][target_2][step_idx] - self.mean_displacement) / self.std_displacement, dtype=torch.float32)
+        target_1 = torch.tensor(0, dtype=torch.int64)
+        target_2 = torch.tensor(0, dtype=torch.int64)
+
+        if self.normalize == 'separate':
+            joint_angles = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx] - self.mean_joints) / (self.var_joints ** (1/2)), dtype=torch.float32)
+            joint_angles_traj = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx:] - self.mean_joints) / (self.var_joints ** (1/2)), dtype=torch.float32)
+        elif self.normalize == 'together':
+            joint_angles = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx] - self.mean_joints_together) / (self.var_joints_together ** (1/2)), dtype=torch.float32)
+            joint_angles_traj = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx:] - self.mean_joints_together) / (self.var_joints_together ** (1/2)), dtype=torch.float32)
+        elif self.normalize == 'none':
+            joint_angles = torch.tensor(self.trials[trial_idx]['joint_angles'][step_idx], dtype=torch.float32)
+            joint_angles_traj = torch.tensor(self.trials[trial_idx]['joint_angles'][step_idx:], dtype=torch.float32)
+        elif self.normalize == 'panda':
+            joint_angles = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx] - self.mean_joints_panda) / self.std_joints_panda, dtype=torch.float32)
+            joint_angles_traj = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx:] - self.mean_joints_panda) / self.std_joints_panda, dtype=torch.float32)
+        elif self.normalize == 'jaco2':
+            joint_angles = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx] - self.mean_joints_jaco) / self.std_joints_jaco, dtype=torch.float32)
+            joint_angles_traj = torch.tensor((self.trials[trial_idx]['joint_angles'][step_idx:] - self.mean_joints_jaco) / self.std_joints_jaco, dtype=torch.float32)
+
 
         length_total = self.length_total
         length_left = max(length_total - ee_traj.shape[0], 0)
@@ -323,36 +344,40 @@ class DMPDatasetEERandTarXYLang(Dataset):
         phis = torch.tensor(np.linspace(0.0, 1.0, length_total, dtype=np.float32))
         mask = torch.ones(phis.shape)
 
-        return img, target_1, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, phis, mask, target_1_xy, sentence[0], joint_angles_traj, displacement_1
+        return img, target_1, target_2, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, target_2_pos, phis, mask, target_1_xy, target_2_xy, sentence[0], joint_angles_traj, displacement_1, displacement_2
 
 
 def pad_collate_xy_lang(batch):
-    (img, target_1, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, phis, mask, target_1_xy, sentence, joint_angles_traj, displacement_1) = zip(*batch)
+    (img, target_1, target_2, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, target_2_pos, phis, mask, target_1_xy, target_2_xy, sentence, joint_angles_traj, displacement_1, displacement_2) = zip(*batch)
 
     img = torch.stack(img)
     target_1 = torch.stack(target_1)
+    target_2 = torch.stack(target_2)
     joint_angles = torch.stack(joint_angles)
     ee_pos = torch.stack(ee_pos)
     length = torch.stack(length)
     target_1_pos = torch.stack(target_1_pos)
+    target_2_pos = torch.stack(target_2_pos)
     ee_traj = torch.nn.utils.rnn.pad_sequence(ee_traj, batch_first=True, padding_value=0)
     ee_traj = torch.transpose(ee_traj, 1, 2)
     ee_xy = np.stack(ee_xy)
     phis = torch.nn.utils.rnn.pad_sequence(phis, batch_first=True, padding_value=0).unsqueeze(1).repeat(1, ee_traj.shape[1] + 1, 1)
     mask = torch.nn.utils.rnn.pad_sequence(mask, batch_first=True, padding_value=0).unsqueeze(1).repeat(1, ee_traj.shape[1] + 1, 1)
     target_1_xy = np.stack(target_1_xy)
+    target_2_xy = np.stack(target_2_xy)
     sentence = torch.stack(sentence)
     joint_angles_traj = torch.nn.utils.rnn.pad_sequence(joint_angles_traj, batch_first=True, padding_value=0)
     joint_angles_traj = torch.transpose(joint_angles_traj, 1, 2)
     displacement_1 = torch.stack(displacement_1)
+    displacement_2 = torch.stack(displacement_2)
 
-    return  img, target_1, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, phis, mask, target_1_xy, sentence, joint_angles_traj, displacement_1
+    return  img, target_1, target_2, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, target_2_pos, phis, mask, target_1_xy, target_2_xy, sentence, joint_angles_traj, displacement_1, displacement_2
 
 
 if __name__ == '__main__':
 
-    data_source_root = '/data/Documents/yzhou298/dataset/extended_modattn/might_be_wrong/pick_push_rotate'
-    data_target_root = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/mae_embed/pick_push_rotate/'
+    data_source_root = '/data/Documents/yzhou298/dataset/extended_modattn/might_be_wrong/put_left_right_to/'
+    data_target_root = '/home/local/ASUAD/yzhou298/Documents/dataset/extended_modattn/mae_embed/put_left_right_to/'
     train_set_path = 'train'
 
     train_dirs = [os.path.join(train_set_path, x) for x in os.listdir(os.path.join(data_source_root, train_set_path))]
@@ -361,25 +386,29 @@ if __name__ == '__main__':
         source_root = data_source_root,
         target_root = data_target_root)
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=1,
-                                          shuffle=False, num_workers=1,
+                                          shuffle=False, num_workers=0,
                                           collate_fn=pad_collate_xy_lang)
-    to_show = 15
+    to_show = 20
     idx = 0
-    for img, target_1, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, phis, mask, target_1_xy, sentence, joint_angles_traj, displacement_1 in data_loader_train:
-        
-        if to_show == idx:
+    for img, target_1, target_2, joint_angles, ee_pos, ee_traj, ee_xy, length, target_1_pos, target_2_pos, phis, mask, target_1_xy, target_2_xy, sentence, joint_angles_traj, displacement_1, displacement_2 in data_loader_train:
+
+        if to_show == idx:        
             # print(img.shape, ee_xy, target_1_pos, target_2_pos, ee_pos, displacement_1, displacement_2)
             print(target_1)
+            print(target_2)
             print(joint_angles)
             print(ee_pos)
             print(ee_traj)
             print(ee_xy)
             print(length)
             print(target_1_pos)
+            print(target_2_pos)
             print(phis)
             print(mask)
             print(target_1_xy)
+            print(target_2_xy)
             print(joint_angles_traj)
             print(displacement_1)
+            print(displacement_2)
             exit()
         idx += 1
