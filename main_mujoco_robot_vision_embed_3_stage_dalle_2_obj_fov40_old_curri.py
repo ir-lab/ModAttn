@@ -524,6 +524,6 @@ def main(writer, name, batch_size=96):
 
 
 if __name__ == '__main__':
-    name = 'train-rgb-sub-attn-abs-action-vision-embed-3-stage-dalle-2-obj-fov40'
+    name = 'train-rgb-sub-attn-abs-action-vision-embed-3-stage-dalle-2-obj-fov40-old-curri'
     writer = SummaryWriter('runs/' + name)
     main(writer, name)
