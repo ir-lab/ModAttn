@@ -497,9 +497,9 @@ def main(batch_size=96):
             test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train), 2, print_attention_map=False)
             test(writer, name, i + 1, data_loader_test, model, criterion, len(data_loader_train), 2, print_attention_map=False, train_split=True)
         
-        if i > 2:
+        if i >= 1:
             loss_stage = 1
-        if i > 3:
+        if i > 8:
             loss_stage = 2
 
 
