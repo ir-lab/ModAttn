@@ -449,8 +449,8 @@ def main(batch_size=96):
                 test(writer, name, i + 1, data_loader_test, model, criterion, len(data_loader_test), loss_stage, print_attention_map=False, train_split=True)
         if i > 1:
             loss_stage = 1
-        elif i > 2:
-            loss_stage = 20
+        if i > 8:
+            loss_stage = 2
 
 
 if __name__ == '__main__':
