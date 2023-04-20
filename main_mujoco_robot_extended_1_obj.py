@@ -94,14 +94,14 @@ def step(data, model, optimizer, criterion, criterion2, stage, writer, epoch_idx
     loss_attn_layer2 = attn_loss(attn_map2, supervision_layer2, criterion, scale=5000)
     
     # Attention Supervision for Target Pos
-    # target_1_pos_attn = torch.gather(attn_map2[:, 0, :], 1, attn_index_tar_1)
-    # loss_target_1_pos_attn = criterion(target_1_pos_attn, torch.ones(attn_map2.shape[0], 1, dtype=torch.float32).to(device)) * 5000
-    loss_target_1_pos_attn = range_supervised_attn_loss(target_1_xy, attn_map2, 0, criterion)
+    target_1_pos_attn = torch.gather(attn_map2[:, 0, :], 1, attn_index_tar_1)
+    loss_target_1_pos_attn = criterion(target_1_pos_attn, torch.ones(attn_map2.shape[0], 1, dtype=torch.float32).to(device)) * 5000
+    # loss_target_1_pos_attn = range_supervised_attn_loss(target_1_xy, attn_map2, 0, criterion)
 
     # Attention Supervision for EE from img
-    # ee_img_attn = torch.gather(attn_map2[:, 3, :], 1, attn_index_ee)
-    # loss_ee_img_attn = criterion(ee_img_attn, torch.ones(attn_map2.shape[0], 1, dtype=torch.float32).to(device)) * 5000
-    loss_ee_img_attn = range_supervised_attn_loss(ee_xy, attn_map2, 3, criterion)
+    ee_img_attn = torch.gather(attn_map2[:, 3, :], 1, attn_index_ee)
+    loss_ee_img_attn = criterion(ee_img_attn, torch.ones(attn_map2.shape[0], 1, dtype=torch.float32).to(device)) * 5000
+    # loss_ee_img_attn = range_supervised_attn_loss(ee_xy, attn_map2, 3, criterion)
 
     # Attention Loss
     loss_attn = loss_attn_layer1 + loss_attn_layer2 + loss_target_1_pos_attn + loss_ee_img_attn
