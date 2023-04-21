@@ -212,7 +212,7 @@ def train_2(writer, name, epoch_idx, data_loader, data_loader_dmp, model,
         global_step = epoch_idx * len(data_loader) + idx
 
         optimizer.zero_grad()
-        loss2 = step(data2, model, optimizer, criterion, criterion2, 2, writer, epoch_idx, idx, len(data_loader_dmp) * 2)
+        loss2 = step(data2, model, optimizer, criterion, criterion2, 2, writer, epoch_idx, idx, len(data_loader_dmp))
         idx = idx + 1
 
         loss = loss2

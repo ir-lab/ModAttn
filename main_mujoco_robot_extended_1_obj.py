@@ -445,8 +445,8 @@ def main(batch_size=96):
             loss_stage = train(writer, name, i, data_loader_train_dmp, model, optimizer, scheduler,
                 criterion, ckpt_path, save_ckpt, loss_stage, print_attention_map=False)
             if whether_test:
-                test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train_dmp), loss_stage, print_attention_map=False)
-                test(writer, name, i + 1, data_loader_test, model, criterion, len(data_loader_test), loss_stage, print_attention_map=False, train_split=True)
+                test(writer, name, i + 1, data_loader_test_dmp, model, criterion, len(data_loader_train), loss_stage, print_attention_map=False)
+                test(writer, name, i + 1, data_loader_test, model, criterion, len(data_loader_train), loss_stage, print_attention_map=False, train_split=True)
         if i > 1:
             loss_stage = 1
         if i > 8:
